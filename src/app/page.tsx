@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { queueTransaction, flushQueuedTransactions } from "@/lib/offlineQueue";
 import type { Transaction } from "@/lib/types";
+import { signOut } from "@/app/login/actions";
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -71,21 +72,27 @@ export default function Home() {
   }
 
   if (!userEmail) {
+    // proxy.ts 已經在 server 端擋掉未登入的請求,這裡短暫顯示只是
+    // 因為瀏覽器端的 getUser() 還沒回來。
     return (
       <main className="flex-1 flex items-center justify-center p-8">
-        <p className="text-sm text-gray-500">
-          尚未登入。Supabase Auth 登入畫面待實作 — 見{" "}
-          <code>src/lib/supabase/client.ts</code>。
-        </p>
+        <p className="text-sm text-gray-500">載入中…</p>
       </main>
     );
   }
 
   return (
     <main className="flex-1 max-w-lg w-full mx-auto p-6 flex flex-col gap-6">
-      <header>
-        <h1 className="text-xl font-semibold">記帳工具</h1>
-        <p className="text-sm text-gray-500">{userEmail}</p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">記帳工具</h1>
+          <p className="text-sm text-gray-500">{userEmail}</p>
+        </div>
+        <form action={signOut}>
+          <button type="submit" className="text-sm text-gray-500 underline">
+            登出
+          </button>
+        </form>
       </header>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
