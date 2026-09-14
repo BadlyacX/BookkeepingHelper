@@ -27,28 +27,15 @@ function formatAmount(n: number): string {
   return n.toLocaleString("zh-Hant");
 }
 
-/** conic-gradient() background for a donut chart of category totals. */
-function donutBackground(
-  transactions: Transaction[],
-  type: TransactionType
-): string {
-  const totals = new Map<string, number>();
-  for (const tx of transactions) {
-    if (tx.type !== type) continue;
-    totals.set(tx.category, (totals.get(tx.category) ?? 0) + tx.amount);
-  }
-  const total = Array.from(totals.values()).reduce((a, b) => a + b, 0);
-  if (total === 0) return "#e5e7eb";
+const DONUT_COLOR: Record<TransactionType, string> = {
+  expense: "#008ae0",
+  income: "#10b981",
+};
 
-  let start = 0;
-  const stops: string[] = [];
-  for (const [categoryId, value] of totals) {
-    const color = findCategory(type, categoryId)?.chartColor ?? "#9ca3af";
-    const end = start + (value / total) * 360;
-    stops.push(`${color} ${start}deg ${end}deg`);
-    start = end;
-  }
-  return `conic-gradient(${stops.join(", ")})`;
+/** Solid-color ring for whichever type (支出/收入) is selected; grey when
+ * there's no data at all for it yet. */
+function donutBackground(total: number, type: TransactionType): string {
+  return total > 0 ? DONUT_COLOR[type] : "#e5e7eb";
 }
 
 export default function Home() {
@@ -187,11 +174,16 @@ export default function Home() {
       <div className="flex justify-center pb-6">
         <div
           className="w-44 h-44 rounded-full flex items-center justify-center"
-          style={{ background: donutBackground(transactions, donutType) }}
+          style={{
+            background: donutBackground(
+              donutType === "expense" ? totalExpense : totalIncome,
+              donutType
+            ),
+          }}
         >
           <div className="w-28 h-28 rounded-full bg-white flex flex-col items-center justify-center">
             <p className="text-xs text-gray-500">結餘</p>
-            <p className="text-lg font-semibold text-[#008ae0]">
+            <p className="text-lg font-semibold text-[#ca8a04]">
               ${formatAmount(balance)}
             </p>
           </div>
