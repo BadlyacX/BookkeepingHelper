@@ -17,6 +17,7 @@
    ```
 
 2. 在 Supabase 的 SQL Editor 執行 [`supabase/schema.sql`](./supabase/schema.sql) 建立 `transactions` 資料表與 RLS 政策。
+   如果之前已經跑過舊版 schema,改跑 [`supabase/migrations/0001_add_transaction_type.sql`](./supabase/migrations/0001_add_transaction_type.sql) 補上 `type` 欄位。
 
 3. 安裝套件並啟動開發伺服器:
 
@@ -32,26 +33,41 @@
 推到 GitHub 後在 Vercel 匯入專案,並透過 Vercel Marketplace 安裝 Supabase 整合(會自動注入
 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` 等環境變數)。`git push` 即自動部署。
 
+## 畫面
+
+- `/login`:Email + 密碼登入 / 註冊
+- `/`:當月總覽 —— 支出/收入合計、甜甜圈圖(依類別佔比)、依日期分組的交易清單、右下角「+」新增
+- `/new`:記帳輸入畫面 —— 支出/收入切換、類別九宮格、計算機式金額輸入、日期選擇
+
+配色走藍/靛色系(`indigo-*`),版面參考市面上常見記帳 App 的類別九宮格 + 計算機鍵盤設計。
+
 ## 專案結構
 
 ```
 src/
   app/
-    api/transactions/route.ts   # 交易 CRUD API(Route Handler)
-    page.tsx                    # 記帳主畫面
+    api/transactions/route.ts   # 交易 CRUD API(Route Handler,支援 ?month=YYYY-MM 篩選)
+    page.tsx                    # 記帳主畫面(月總覽 + 甜甜圈圖 + 交易清單)
+    new/page.tsx                # 記帳輸入畫面(類別九宮格 + 計算機鍵盤)
+    login/page.tsx, login/actions.ts   # 登入 / 註冊(Server Actions)
     layout.tsx                  # PWA metadata、manifest、service worker 註冊
     service-worker-registration.tsx
   lib/
     supabase/client.ts          # Browser 端 Supabase client
     supabase/server.ts          # Server 端 Supabase client(Route Handler / Server Component)
     offlineQueue.ts             # IndexedDB 離線佇列(離線新增 → 恢復網路後同步)
+    categories.ts               # 支出/收入類別定義(icon、顏色)
+    calculator.ts               # 金額輸入用的簡易計算機邏輯
+    date.ts                     # 日期/月份格式化小工具
     types.ts
-  middleware.ts                 # 刷新 Supabase auth session cookie
+  proxy.ts                      # 刷新 Supabase auth session cookie、保護未登入路由
 supabase/schema.sql             # transactions 資料表 + RLS
+supabase/migrations/            # 既有資料庫的增量 migration
 public/manifest.json, sw.js, icons/
 ```
 
 ## 待辦
-- Supabase Auth 登入畫面(目前 `src/app/page.tsx` 假設已登入,未登入時只顯示提示文字)
-- 類別管理、統計圖表
+- 類別管理(目前類別是寫死在 `src/lib/categories.ts`,還不能自訂)
+- 交易編輯/刪除(目前只能新增)
 - 把 `public/icons/` 底下的佔位圖示換成正式 App icon
+- Supabase Dashboard → Authentication 把「Allow new users to sign up」關掉,避免陌生人自行註冊

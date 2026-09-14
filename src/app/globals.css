@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 @theme inline {
@@ -12,13 +12,8 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* 這個記帳介面走固定的淺色主題(參考範例是淺色 + 彩色圖示),
+   不跟系統深色模式走,避免圖示配色、甜甜圈圖表在深色下對比失衡。 */
 body {
   background: var(--background);
   color: var(--foreground);

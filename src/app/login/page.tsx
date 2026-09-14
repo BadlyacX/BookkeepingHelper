@@ -7,10 +7,10 @@ export default async function LoginPage(props: PageProps<"/login">) {
   const email = typeof searchParams.email === "string" ? searchParams.email : "";
 
   return (
-    <main className="flex-1 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm flex flex-col gap-4">
+    <main className="flex-1 flex items-center justify-center p-6 bg-slate-50">
+      <div className="w-full max-w-sm flex flex-col gap-4 bg-white rounded-2xl shadow-sm p-6">
         <header>
-          <h1 className="text-xl font-semibold">記帳工具</h1>
+          <h1 className="text-xl font-semibold text-slate-900">記帳工具</h1>
           <p className="text-sm text-gray-500">登入以繼續</p>
         </header>
 
@@ -22,7 +22,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
             required
             autoComplete="email"
             defaultValue={email}
-            className="border rounded px-3 py-2"
+            className="border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
           <input
             type="password"
@@ -31,7 +31,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
             required
             autoComplete="current-password"
             minLength={6}
-            className="border rounded px-3 py-2"
+            className="border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
 
           {error && <p className="text-sm text-red-600">{error}</p>}
@@ -40,13 +40,13 @@ export default async function LoginPage(props: PageProps<"/login">) {
           <div className="flex gap-2">
             <button
               formAction={login}
-              className="flex-1 bg-slate-900 text-white rounded px-3 py-2"
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-2 font-medium transition"
             >
               登入
             </button>
             <button
               formAction={signup}
-              className="flex-1 border rounded px-3 py-2"
+              className="flex-1 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-2 font-medium hover:bg-indigo-50 transition"
             >
               註冊
             </button>

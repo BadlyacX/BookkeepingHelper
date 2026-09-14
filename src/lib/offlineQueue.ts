@@ -100,6 +100,7 @@ export async function flushQueuedTransactions(): Promise<{
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          type: tx.type,
           occurred_on: tx.occurred_on,
           amount: tx.amount,
           category: tx.category,

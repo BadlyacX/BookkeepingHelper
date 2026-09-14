@@ -4,9 +4,10 @@
 create table if not exists public.transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
+  type text not null default 'expense' check (type in ('expense', 'income')), -- 支出 / 收入
   occurred_on date not null default current_date, -- 日期
-  amount numeric(12, 2) not null,                  -- 金額(支出為負、收入為正,或另加 type 欄位)
-  category text not null,                          -- 類別
+  amount numeric(12, 2) not null check (amount >= 0), -- 金額(一律存正數,正負靠 type 判斷)
+  category text not null,                          -- 類別(見 src/lib/categories.ts 的 id)
   note text,                                       -- 備註
   created_at timestamptz not null default now()
 );
