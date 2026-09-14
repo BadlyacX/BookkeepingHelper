@@ -83,17 +83,39 @@ export default function NewTransactionPage() {
 
     try {
       if (!navigator.onLine) {
+        // Genuinely offline: queue locally, sync later.
         await queueTransaction(tx);
-      } else {
-        const res = await fetch("/api/transactions", {
+        router.push("/");
+        router.refresh();
+        return;
+      }
+
+      let res: Response;
+      try {
+        res = await fetch("/api/transactions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(tx),
         });
-        if (!res.ok) {
-          await queueTransaction(tx);
-        }
+      } catch {
+        // fetch() itself threw — network is actually unreachable even
+        // though navigator.onLine said otherwise. Queue and move on.
+        await queueTransaction(tx);
+        router.push("/");
+        router.refresh();
+        return;
       }
+
+      if (!res.ok) {
+        // The server reached us and rejected the request (bad data,
+        // RLS, missing column, expired session, ...) — this is a real
+        // error, not an offline situation. Show it instead of quietly
+        // queueing the transaction and pretending it saved.
+        const body = await res.json().catch(() => null);
+        setError(body?.error ?? `送出失敗(HTTP ${res.status})`);
+        return;
+      }
+
       router.push("/");
       router.refresh();
     } finally {
