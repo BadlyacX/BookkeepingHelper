@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { flushQueuedTransactions } from "@/lib/offlineQueue";
-import { findCategory, type TransactionType } from "@/lib/categories";
+import { findCategory } from "@/lib/categories";
 import {
   currentMonth,
   formatMonthLabel,
@@ -27,22 +27,24 @@ function formatAmount(n: number): string {
   return n.toLocaleString("zh-Hant");
 }
 
-const DONUT_COLOR: Record<TransactionType, string> = {
-  expense: "#008ae0",
-  income: "#10b981",
-};
+const EXPENSE_COLOR = "#008ae0";
+const INCOME_COLOR = "#ca8a04";
 
-/** Solid-color ring for whichever type (支出/收入) is selected; grey when
- * there's no data at all for it yet. */
-function donutBackground(total: number, type: TransactionType): string {
-  return total > 0 ? DONUT_COLOR[type] : "#e5e7eb";
+/** Ring showing 支出 as a share of 收入 this month: blue slice for the
+ * spent portion, yellow for the rest of income. Caps at a full blue
+ * ring if expense >= income (spent it all, or more); grey when there's
+ * no income or expense at all yet. */
+function donutBackground(totalExpense: number, totalIncome: number): string {
+  if (totalIncome <= 0) return totalExpense > 0 ? EXPENSE_COLOR : "#e5e7eb";
+  const ratio = Math.min(totalExpense / totalIncome, 1);
+  const angle = ratio * 360;
+  return `conic-gradient(${EXPENSE_COLOR} 0deg ${angle}deg, ${INCOME_COLOR} ${angle}deg 360deg)`;
 }
 
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [month, setMonth] = useState(currentMonth());
-  const [donutType, setDonutType] = useState<TransactionType>("expense");
   const [menuOpen, setMenuOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
@@ -149,41 +151,28 @@ export default function Home() {
       )}
 
       <div className="flex justify-around px-4 py-4">
-        <button
-          type="button"
-          onClick={() => setDonutType("expense")}
-          className={`text-center rounded-lg px-4 py-1 ${donutType === "expense" ? "bg-indigo-50" : ""}`}
-        >
+        <div className="text-center rounded-lg px-4 py-1">
           <p className="text-xs text-gray-500">支出</p>
-          <p className="text-lg font-semibold text-indigo-600">
+          <p className="text-lg font-semibold" style={{ color: EXPENSE_COLOR }}>
             ${formatAmount(totalExpense)}
           </p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setDonutType("income")}
-          className={`text-center rounded-lg px-4 py-1 ${donutType === "income" ? "bg-emerald-50" : ""}`}
-        >
+        </div>
+        <div className="text-center rounded-lg px-4 py-1">
           <p className="text-xs text-gray-500">收入</p>
-          <p className="text-lg font-semibold text-emerald-600">
+          <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
             ${formatAmount(totalIncome)}
           </p>
-        </button>
+        </div>
       </div>
 
       <div className="flex justify-center pb-6">
         <div
           className="w-44 h-44 rounded-full flex items-center justify-center"
-          style={{
-            background: donutBackground(
-              donutType === "expense" ? totalExpense : totalIncome,
-              donutType
-            ),
-          }}
+          style={{ background: donutBackground(totalExpense, totalIncome) }}
         >
           <div className="w-28 h-28 rounded-full bg-white flex flex-col items-center justify-center">
             <p className="text-xs text-gray-500">結餘</p>
-            <p className="text-lg font-semibold text-[#ca8a04]">
+            <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
               ${formatAmount(balance)}
             </p>
           </div>
