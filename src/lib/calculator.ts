@@ -33,7 +33,8 @@ export type CalculatorAction =
   | { type: "decimal" }
   | { type: "operator"; operator: Operator }
   | { type: "backspace" }
-  | { type: "clear" };
+  | { type: "clear" }
+  | { type: "set"; value: number };
 
 export function calculatorReducer(
   state: CalculatorState,
@@ -85,6 +86,17 @@ export function calculatorReducer(
 
     case "clear":
       return initialCalculatorState;
+
+    // Load a preset amount (e.g. when opening an existing transaction
+    // to edit). Pressing a digit next starts a fresh number, like
+    // recalling a value on a real calculator.
+    case "set":
+      return {
+        display: formatNumber(action.value),
+        previousValue: null,
+        operator: null,
+        overwrite: true,
+      };
 
     default:
       return state;

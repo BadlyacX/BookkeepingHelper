@@ -1,7 +1,7 @@
 "use client";
 
-import { useReducer, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useReducer, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   calculatorReducer,
   calculatorValue,
@@ -12,6 +12,7 @@ import { categoriesForType } from "@/lib/categories";
 import { formatDateWithWeekday, isToday, shiftDate, todayIsoDate } from "@/lib/date";
 import { queueTransaction } from "@/lib/offlineQueue";
 import type { TransactionType } from "@/lib/categories";
+import type { Transaction } from "@/lib/types";
 
 const KEYPAD_ROWS: Array<Array<{ label: string; kind: "digit" | "op" | "decimal" | "clear" | "backspace" }>> = [
   [
@@ -43,18 +44,55 @@ const KEYPAD_ROWS: Array<Array<{ label: string; kind: "digit" | "op" | "decimal"
 ];
 
 export default function NewTransactionPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex-1 flex items-center justify-center p-8">
+          <p className="text-sm text-gray-500">載入中…</p>
+        </main>
+      }
+    >
+      <NewTransactionForm />
+    </Suspense>
+  );
+}
+
+function NewTransactionForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("id");
+
   const [type, setType] = useState<TransactionType>("expense");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [occurredOn, setOccurredOn] = useState(todayIsoDate());
   const [calc, dispatch] = useReducer(calculatorReducer, initialCalculatorState);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [loading, setLoading] = useState(!!editId);
   const [error, setError] = useState<string | null>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const categories = categoriesForType(type);
   const amount = calculatorValue(calc);
+
+  useEffect(() => {
+    if (!editId) return;
+    fetch(`/api/transactions/${editId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("找不到這筆紀錄");
+        return res.json();
+      })
+      .then(({ data }: { data: Transaction }) => {
+        setType(data.type);
+        setCategoryId(data.category);
+        setNote(data.note ?? "");
+        setOccurredOn(data.occurred_on);
+        dispatch({ type: "set", value: data.amount });
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "載入失敗"))
+      .finally(() => setLoading(false));
+  }, [editId]);
 
   function switchType(nextType: TransactionType) {
     setType(nextType);
@@ -81,9 +119,13 @@ export default function NewTransactionPage() {
       note: note || undefined,
     };
 
+    const url = editId ? `/api/transactions/${editId}` : "/api/transactions";
+    const method = editId ? "PATCH" : "POST";
+
     try {
-      if (!navigator.onLine) {
-        // Genuinely offline: queue locally, sync later.
+      if (!editId && !navigator.onLine) {
+        // Genuinely offline: queue locally, sync later. (Editing while
+        // offline isn't supported yet — only new entries queue.)
         await queueTransaction(tx);
         router.push("/");
         router.refresh();
@@ -92,12 +134,16 @@ export default function NewTransactionPage() {
 
       let res: Response;
       try {
-        res = await fetch("/api/transactions", {
-          method: "POST",
+        res = await fetch(url, {
+          method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(tx),
         });
       } catch {
+        if (editId) {
+          setError("網路連線失敗,請稍後再試一次");
+          return;
+        }
         // fetch() itself threw — network is actually unreachable even
         // though navigator.onLine said otherwise. Queue and move on.
         await queueTransaction(tx);
@@ -121,6 +167,36 @@ export default function NewTransactionPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleDelete() {
+    if (!editId) return;
+    if (!window.confirm("確定要刪除這筆紀錄嗎?")) return;
+
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/transactions/${editId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.error ?? `刪除失敗(HTTP ${res.status})`);
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } catch {
+      setError("網路連線失敗,請稍後再試一次");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="flex-1 flex items-center justify-center p-8">
+        <p className="text-sm text-gray-500">載入中…</p>
+      </main>
+    );
   }
 
   return (
@@ -154,6 +230,17 @@ export default function NewTransactionPage() {
             收入
           </button>
         </div>
+        {editId && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            aria-label="刪除"
+            className="text-xl text-rose-500 disabled:opacity-60"
+          >
+            🗑️
+          </button>
+        )}
       </header>
 
       <div className="grid grid-cols-4 gap-y-4 px-4 py-4">
@@ -260,7 +347,7 @@ export default function NewTransactionPage() {
             style={{ gridColumn: "5", gridRow: "3 / span 2" }}
             className="h-full flex items-center justify-center text-lg font-semibold bg-indigo-600 text-white disabled:opacity-60"
           >
-            {submitting ? "…" : "OK"}
+            {submitting ? "…" : editId ? "更新" : "OK"}
           </button>
         </div>
       </div>

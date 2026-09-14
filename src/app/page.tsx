@@ -202,9 +202,10 @@ export default function Home() {
               {txs.map((tx) => {
                 const category = findCategory(tx.type, tx.category);
                 return (
-                  <div
+                  <Link
                     key={tx.id}
-                    className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50"
+                    href={`/new?id=${tx.id}`}
+                    className="relative flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 bg-white transition-all duration-150 hover:z-10 hover:bg-gray-50 hover:shadow-md hover:-translate-y-0.5 active:bg-gray-100"
                   >
                     <span
                       className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${category?.chipClassName ?? "bg-gray-100"}`}
@@ -221,7 +222,7 @@ export default function Home() {
                       {tx.type === "income" ? "+" : "-"}
                       {formatAmount(tx.amount)}
                     </span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
