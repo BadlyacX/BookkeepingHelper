@@ -4,6 +4,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
   const searchParams = await props.searchParams;
   const error = typeof searchParams.error === "string" ? searchParams.error : null;
   const notice = typeof searchParams.notice === "string" ? searchParams.notice : null;
+  const email = typeof searchParams.email === "string" ? searchParams.email : "";
 
   return (
     <main className="flex-1 flex items-center justify-center p-6">
@@ -20,6 +21,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
             placeholder="Email"
             required
             autoComplete="email"
+            defaultValue={email}
             className="border rounded px-3 py-2"
           />
           <input
