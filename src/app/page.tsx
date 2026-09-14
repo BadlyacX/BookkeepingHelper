@@ -191,9 +191,7 @@ export default function Home() {
         >
           <div className="w-28 h-28 rounded-full bg-white flex flex-col items-center justify-center">
             <p className="text-xs text-gray-500">結餘</p>
-            <p
-              className={`text-lg font-semibold ${balance < 0 ? "text-rose-600" : "text-gray-900"}`}
-            >
+            <p className="text-lg font-semibold text-[#008ae0]">
               ${formatAmount(balance)}
             </p>
           </div>
