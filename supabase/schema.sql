@@ -18,18 +18,24 @@ create index if not exists transactions_user_id_occurred_on_idx
 -- Row Level Security:每個使用者只能存取自己的資料(多裝置共用同一帳號時仍安全)
 alter table public.transactions enable row level security;
 
+-- drop + create(而不是 create policy if not exists,因為 Postgres 的
+-- create policy 沒有 if not exists)這樣整份檔案可以放心重複貼上執行。
+drop policy if exists "Users can view their own transactions" on public.transactions;
 create policy "Users can view their own transactions"
   on public.transactions for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert their own transactions" on public.transactions;
 create policy "Users can insert their own transactions"
   on public.transactions for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own transactions" on public.transactions;
 create policy "Users can update their own transactions"
   on public.transactions for update
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can delete their own transactions" on public.transactions;
 create policy "Users can delete their own transactions"
   on public.transactions for delete
   using (auth.uid() = user_id);
