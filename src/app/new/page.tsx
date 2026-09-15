@@ -48,7 +48,7 @@ export default function NewTransactionPage() {
     <Suspense
       fallback={
         <main className="flex-1 flex items-center justify-center p-8">
-          <p className="text-sm text-gray-500">載入中…</p>
+          <p className="text-sm text-gray-500 dark:text-slate-400">載入中…</p>
         </main>
       }
     >
@@ -194,28 +194,28 @@ function NewTransactionForm() {
   if (loading) {
     return (
       <main className="flex-1 flex items-center justify-center p-8">
-        <p className="text-sm text-gray-500">載入中…</p>
+        <p className="text-sm text-gray-500 dark:text-slate-400">載入中…</p>
       </main>
     );
   }
 
   return (
-    <main className="flex-1 flex flex-col max-w-md w-full mx-auto bg-white min-h-dvh">
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+    <main className="flex-1 flex flex-col max-w-md w-full mx-auto bg-white dark:bg-slate-900 min-h-dvh">
+      <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-slate-700">
         <button
           type="button"
           onClick={() => router.back()}
           aria-label="返回"
-          className="text-xl text-gray-500"
+          className="text-xl text-gray-500 dark:text-slate-400"
         >
           ←
         </button>
-        <div className="flex-1 flex bg-gray-100 rounded-full p-1">
+        <div className="flex-1 flex bg-gray-100 dark:bg-slate-800 rounded-full p-1">
           <button
             type="button"
             onClick={() => switchType("expense")}
             className={`flex-1 rounded-full py-1.5 text-sm font-medium transition ${
-              type === "expense" ? "bg-indigo-600 text-white" : "text-gray-500"
+              type === "expense" ? "bg-indigo-600 text-white" : "text-gray-500 dark:text-slate-400"
             }`}
           >
             支出
@@ -224,7 +224,7 @@ function NewTransactionForm() {
             type="button"
             onClick={() => switchType("income")}
             className={`flex-1 rounded-full py-1.5 text-sm font-medium transition ${
-              type === "income" ? "bg-indigo-600 text-white" : "text-gray-500"
+              type === "income" ? "bg-indigo-600 text-white" : "text-gray-500 dark:text-slate-400"
             }`}
           >
             收入
@@ -258,13 +258,13 @@ function NewTransactionForm() {
             >
               {cat.emoji}
             </span>
-            <span className="text-xs text-gray-600">{cat.label}</span>
+            <span className="text-xs text-gray-600 dark:text-slate-400">{cat.label}</span>
           </button>
         ))}
       </div>
 
       <div className="mt-auto">
-        <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-100">
+        <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-100 dark:border-slate-700">
           <span className="text-2xl">
             {categoryId ? categories.find((c) => c.id === categoryId)?.emoji : "🙂"}
           </span>
@@ -273,18 +273,18 @@ function NewTransactionForm() {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="備註"
-            className="flex-1 text-sm outline-none"
+            className="flex-1 text-sm outline-none bg-transparent dark:text-slate-100 placeholder:dark:text-slate-500"
           />
-          <span className="text-lg font-semibold tabular-nums">
+          <span className="text-lg font-semibold tabular-nums dark:text-slate-100">
             $ {calc.display}
           </span>
         </div>
 
         {error && (
-          <p className="px-4 pb-2 text-sm text-red-600">{error}</p>
+          <p className="px-4 pb-2 text-sm text-red-600 dark:text-red-400">{error}</p>
         )}
 
-        <div className="flex items-center justify-between px-4 py-2 bg-indigo-50 text-indigo-900">
+        <div className="flex items-center justify-between px-4 py-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200">
           <button
             type="button"
             onClick={() => setOccurredOn((d) => shiftDate(d, -1))}
@@ -316,7 +316,7 @@ function NewTransactionForm() {
           </button>
         </div>
 
-        <div className="grid grid-cols-5 gap-px bg-indigo-100 p-px">
+        <div className="grid grid-cols-5 gap-px bg-indigo-100 dark:bg-slate-700 p-px">
           {KEYPAD_ROWS.map((row, rowIndex) =>
             row.map((key) => (
               <button
@@ -332,8 +332,8 @@ function NewTransactionForm() {
                 }}
                 className={`h-14 flex items-center justify-center text-lg font-medium ${
                   key.kind === "op" || key.kind === "clear" || key.kind === "backspace"
-                    ? "bg-indigo-100 text-indigo-700"
-                    : "bg-white text-gray-800"
+                    ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
+                    : "bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-100"
                 }`}
               >
                 {key.label}
