@@ -49,6 +49,12 @@ export async function getQueuedTransactions(): Promise<QueuedTransaction[]> {
   });
 }
 
+/** Discard a not-yet-synced transaction (e.g. the user deleted it
+ * before it ever reached the server). */
+export async function deleteQueuedTransaction(localId: string): Promise<void> {
+  return removeQueuedTransaction(localId);
+}
+
 async function removeQueuedTransaction(localId: string): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {

@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { flushQueuedTransactions, getQueuedTransactions } from "@/lib/offlineQueue";
+import {
+  deleteQueuedTransaction,
+  flushQueuedTransactions,
+  getQueuedTransactions,
+} from "@/lib/offlineQueue";
 import { cacheMonthTransactions, getCachedMonthTransactions } from "@/lib/transactionCache";
 import { findCategory } from "@/lib/categories";
 import {
@@ -17,6 +21,7 @@ import {
 import type { Transaction } from "@/lib/types";
 import { signOut } from "@/app/login/actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SwipeToDelete } from "@/components/SwipeToDelete";
 
 function groupByDate<T extends { occurred_on: string }>(transactions: T[]): Array<[string, T[]]> {
   const groups = new Map<string, T[]>();
@@ -47,7 +52,7 @@ function donutBackground(totalExpense: number, totalIncome: number): string {
   return `conic-gradient(${EXPENSE_COLOR} 0deg ${angle}deg, ${INCOME_COLOR} ${angle}deg 360deg)`;
 }
 
-type DisplayTransaction = Transaction & { pending?: boolean };
+type DisplayTransaction = Transaction & { pending?: boolean; localId?: string };
 type LoadResult = { data: DisplayTransaction[]; offline: boolean; syncedAt: string | null };
 
 /**
@@ -85,6 +90,7 @@ async function loadMonth(month: string): Promise<LoadResult> {
       note: q.note ?? null,
       created_at: q.queuedAt,
       pending: true,
+      localId: q.localId,
     }));
 
   const data = [...pending, ...base.data].sort(
@@ -145,6 +151,13 @@ export default function Home() {
   const remainingDays = remainingDaysInMonth(month);
   const dailyBudget = balance / remainingDays;
 
+  async function refresh() {
+    const result = await loadMonth(month);
+    setTransactions(result.data);
+    setOffline(result.offline);
+    if (result.offline) setCacheSyncedAt(result.syncedAt);
+  }
+
   async function handleSync() {
     const { synced, remaining } = await flushQueuedTransactions();
     setSyncMessage(
@@ -152,10 +165,29 @@ export default function Home() {
         ? "沒有待同步的離線紀錄"
         : `已同步 ${synced} 筆${remaining > 0 ? `,還有 ${remaining} 筆待同步` : ""}`
     );
-    const result = await loadMonth(month);
-    setTransactions(result.data);
-    setOffline(result.offline);
-    if (result.offline) setCacheSyncedAt(result.syncedAt);
+    await refresh();
+  }
+
+  async function handleDeleteTransaction(tx: DisplayTransaction) {
+    if (!window.confirm("確定要刪除這筆紀錄嗎?")) return;
+
+    if (tx.pending && tx.localId) {
+      await deleteQueuedTransaction(tx.localId);
+      await refresh();
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/transactions/${tx.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        setSyncMessage("刪除失敗,請確認網路連線後再試一次");
+        return;
+      }
+    } catch {
+      setSyncMessage("刪除失敗,請確認網路連線後再試一次");
+      return;
+    }
+    await refresh();
   }
 
   if (!userEmail) {
@@ -327,8 +359,15 @@ export default function Home() {
               </div>
               {txs.map((tx) => {
                 const category = findCategory(tx.type, tx.category);
-                const row = (
-                  <>
+                return (
+                  <SwipeToDelete
+                    key={tx.id}
+                    // 還沒同步到伺服器的項目沒有真正的資料庫 id,點進去編輯
+                    // 會 404,所以不給 href——但一樣可以左滑刪除。
+                    href={tx.pending ? undefined : `/new?id=${tx.id}`}
+                    dimmed={tx.pending}
+                    onDelete={() => handleDeleteTransaction(tx)}
+                  >
                     <span
                       className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${category?.chipClassName ?? "bg-gray-100 dark:bg-slate-700"}`}
                     >
@@ -349,30 +388,7 @@ export default function Home() {
                       {tx.type === "income" ? "+" : "-"}
                       {formatAmount(tx.amount)}
                     </span>
-                  </>
-                );
-
-                // 還沒同步到伺服器的項目沒有真正的資料庫 id,點進去編輯會
-                // 404,所以先讓它不能點,只顯示內容。
-                if (tx.pending) {
-                  return (
-                    <div
-                      key={tx.id}
-                      className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 opacity-70"
-                    >
-                      {row}
-                    </div>
-                  );
-                }
-
-                return (
-                  <Link
-                    key={tx.id}
-                    href={`/new?id=${tx.id}`}
-                    className="relative flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-150 hover:z-10 hover:bg-gray-50 dark:hover:bg-slate-800 hover:shadow-md hover:-translate-y-0.5 active:bg-gray-100 dark:active:bg-slate-700"
-                  >
-                    {row}
-                  </Link>
+                  </SwipeToDelete>
                 );
               })}
             </div>
