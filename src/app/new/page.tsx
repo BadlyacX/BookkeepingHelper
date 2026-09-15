@@ -72,6 +72,12 @@ function NewTransactionForm() {
   const [loading, setLoading] = useState(!!editId);
   const [error, setError] = useState<string | null>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  // Guards against double-submit from a fast double-tap: `submitting`
+  // (state) only disables the button after React re-renders, and a
+  // second tap can land before that paint happens. A ref updates
+  // synchronously, so checking it is reliable regardless of timing.
+  const submittingRef = useRef(false);
+  const deletingRef = useRef(false);
 
   const categories = categoriesForType(type);
   const amount = calculatorValue(calc);
@@ -100,6 +106,7 @@ function NewTransactionForm() {
   }
 
   async function handleSubmit() {
+    if (submittingRef.current) return;
     if (!categoryId) {
       setError("請選擇類別");
       return;
@@ -108,6 +115,7 @@ function NewTransactionForm() {
       setError("金額要大於 0");
       return;
     }
+    submittingRef.current = true;
     setError(null);
     setSubmitting(true);
 
@@ -162,14 +170,16 @@ function NewTransactionForm() {
       router.push("/");
       router.refresh();
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   async function handleDelete() {
-    if (!editId) return;
+    if (!editId || deletingRef.current) return;
     if (!window.confirm("確定要刪除這筆紀錄嗎?")) return;
 
+    deletingRef.current = true;
     setDeleting(true);
     setError(null);
     try {
@@ -184,6 +194,7 @@ function NewTransactionForm() {
     } catch {
       setError("網路連線失敗,請稍後再試一次");
     } finally {
+      deletingRef.current = false;
       setDeleting(false);
     }
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -120,6 +120,11 @@ async function loadMonth(month: string): Promise<LoadResult> {
 
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  // Which transactions currently have a delete in flight — guards
+  // against a fast double-tap firing the delete twice (a `deleting`
+  // state alone can't catch a second tap that lands before the
+  // re-render that would've disabled the button).
+  const deletingIdsRef = useRef<Set<string>>(new Set());
   const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
   const [month, setMonth] = useState(currentMonth());
   const [menuOpen, setMenuOpen] = useState(false);
@@ -211,25 +216,32 @@ export default function Home() {
   }
 
   async function handleDeleteTransaction(tx: DisplayTransaction) {
+    if (deletingIdsRef.current.has(tx.id)) return;
     if (!window.confirm("確定要刪除這筆紀錄嗎?")) return;
-
-    if (tx.pending && tx.localId) {
-      await deleteQueuedTransaction(tx.localId);
-      await refresh();
-      return;
-    }
+    if (deletingIdsRef.current.has(tx.id)) return;
+    deletingIdsRef.current.add(tx.id);
 
     try {
-      const res = await fetch(`/api/transactions/${tx.id}`, { method: "DELETE" });
-      if (!res.ok) {
+      if (tx.pending && tx.localId) {
+        await deleteQueuedTransaction(tx.localId);
+        await refresh();
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/transactions/${tx.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          setSyncMessage("刪除失敗,請確認網路連線後再試一次");
+          return;
+        }
+      } catch {
         setSyncMessage("刪除失敗,請確認網路連線後再試一次");
         return;
       }
-    } catch {
-      setSyncMessage("刪除失敗,請確認網路連線後再試一次");
-      return;
+      await refresh();
+    } finally {
+      deletingIdsRef.current.delete(tx.id);
     }
-    await refresh();
   }
 
   if (!userEmail) {
