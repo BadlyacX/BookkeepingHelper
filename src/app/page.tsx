@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { flushQueuedTransactions } from "@/lib/offlineQueue";
+import { flushQueuedTransactions, getQueuedTransactions } from "@/lib/offlineQueue";
 import { cacheMonthTransactions, getCachedMonthTransactions } from "@/lib/transactionCache";
 import { findCategory } from "@/lib/categories";
 import {
   currentMonth,
   formatMonthLabel,
+  isoDateToMonth,
   remainingDaysInMonth,
   shiftMonth,
 } from "@/lib/date";
@@ -17,8 +18,8 @@ import type { Transaction } from "@/lib/types";
 import { signOut } from "@/app/login/actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-function groupByDate(transactions: Transaction[]): Array<[string, Transaction[]]> {
-  const groups = new Map<string, Transaction[]>();
+function groupByDate<T extends { occurred_on: string }>(transactions: T[]): Array<[string, T[]]> {
+  const groups = new Map<string, T[]>();
   for (const tx of transactions) {
     const list = groups.get(tx.occurred_on) ?? [];
     list.push(tx);
@@ -46,30 +47,56 @@ function donutBackground(totalExpense: number, totalIncome: number): string {
   return `conic-gradient(${EXPENSE_COLOR} 0deg ${angle}deg, ${INCOME_COLOR} ${angle}deg 360deg)`;
 }
 
-type LoadResult = { data: Transaction[]; offline: boolean; syncedAt: string | null };
+type DisplayTransaction = Transaction & { pending?: boolean };
+type LoadResult = { data: DisplayTransaction[]; offline: boolean; syncedAt: string | null };
 
 /**
  * GET this month's transactions; on success, refresh the local cache
  * so it's there next time we're offline. On failure (offline, or a
- * real server error), fall back to whatever was cached last.
+ * real server error), fall back to whatever was cached last. Either
+ * way, also mix in any still-queued (not-yet-synced) transactions for
+ * this month, so something added while offline shows up immediately
+ * instead of only after it's actually reached the server.
  */
 async function loadMonth(month: string): Promise<LoadResult> {
+  let base: { data: DisplayTransaction[]; offline: boolean; syncedAt: string | null };
   try {
     const res = await fetch(`/api/transactions?month=${month}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const body = await res.json();
     const data: Transaction[] = body.data ?? [];
     cacheMonthTransactions(month, data).catch(() => {});
-    return { data, offline: false, syncedAt: null };
+    base = { data, offline: false, syncedAt: null };
   } catch {
     const cached = await getCachedMonthTransactions(month).catch(() => null);
-    return { data: cached?.transactions ?? [], offline: true, syncedAt: cached?.syncedAt ?? null };
+    base = { data: cached?.transactions ?? [], offline: true, syncedAt: cached?.syncedAt ?? null };
   }
+
+  const queued = await getQueuedTransactions().catch(() => []);
+  const pending: DisplayTransaction[] = queued
+    .filter((q) => isoDateToMonth(q.occurred_on) === month)
+    .map((q) => ({
+      id: `pending-${q.localId}`,
+      user_id: "",
+      type: q.type,
+      occurred_on: q.occurred_on,
+      amount: q.amount,
+      category: q.category,
+      note: q.note ?? null,
+      created_at: q.queuedAt,
+      pending: true,
+    }));
+
+  const data = [...pending, ...base.data].sort(
+    (a, b) => b.occurred_on.localeCompare(a.occurred_on) || b.created_at.localeCompare(a.created_at)
+  );
+
+  return { ...base, data };
 }
 
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
   const [month, setMonth] = useState(currentMonth());
   const [menuOpen, setMenuOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -300,12 +327,8 @@ export default function Home() {
               </div>
               {txs.map((tx) => {
                 const category = findCategory(tx.type, tx.category);
-                return (
-                  <Link
-                    key={tx.id}
-                    href={`/new?id=${tx.id}`}
-                    className="relative flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-150 hover:z-10 hover:bg-gray-50 dark:hover:bg-slate-800 hover:shadow-md hover:-translate-y-0.5 active:bg-gray-100 dark:active:bg-slate-700"
-                  >
+                const row = (
+                  <>
                     <span
                       className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${category?.chipClassName ?? "bg-gray-100 dark:bg-slate-700"}`}
                     >
@@ -314,6 +337,11 @@ export default function Home() {
                     <span className="flex-1 text-sm truncate dark:text-slate-100">
                       {category?.label ?? tx.category}
                       {tx.note ? `‧${tx.note}` : ""}
+                      {tx.pending && (
+                        <span className="ml-1.5 text-xs text-amber-600 dark:text-amber-400">
+                          ⏳ 待同步
+                        </span>
+                      )}
                     </span>
                     <span
                       className={`text-sm font-medium tabular-nums ${tx.type === "income" ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-slate-100"}`}
@@ -321,6 +349,29 @@ export default function Home() {
                       {tx.type === "income" ? "+" : "-"}
                       {formatAmount(tx.amount)}
                     </span>
+                  </>
+                );
+
+                // 還沒同步到伺服器的項目沒有真正的資料庫 id,點進去編輯會
+                // 404,所以先讓它不能點,只顯示內容。
+                if (tx.pending) {
+                  return (
+                    <div
+                      key={tx.id}
+                      className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 opacity-70"
+                    >
+                      {row}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={tx.id}
+                    href={`/new?id=${tx.id}`}
+                    className="relative flex items-center gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-150 hover:z-10 hover:bg-gray-50 dark:hover:bg-slate-800 hover:shadow-md hover:-translate-y-0.5 active:bg-gray-100 dark:active:bg-slate-700"
+                  >
+                    {row}
                   </Link>
                 );
               })}
