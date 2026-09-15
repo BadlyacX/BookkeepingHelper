@@ -55,28 +55,14 @@ function donutBackground(totalExpense: number, totalIncome: number): string {
 type DisplayTransaction = Transaction & { pending?: boolean; localId?: string };
 type LoadResult = { data: DisplayTransaction[]; offline: boolean; syncedAt: string | null };
 
-/**
- * GET this month's transactions; on success, refresh the local cache
- * so it's there next time we're offline. On failure (offline, or a
- * real server error), fall back to whatever was cached last. Either
- * way, also mix in any still-queued (not-yet-synced) transactions for
- * this month, so something added while offline shows up immediately
- * instead of only after it's actually reached the server.
- */
-async function loadMonth(month: string): Promise<LoadResult> {
-  let base: { data: DisplayTransaction[]; offline: boolean; syncedAt: string | null };
-  try {
-    const res = await fetch(`/api/transactions?month=${month}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const body = await res.json();
-    const data: Transaction[] = body.data ?? [];
-    cacheMonthTransactions(month, data).catch(() => {});
-    base = { data, offline: false, syncedAt: null };
-  } catch {
-    const cached = await getCachedMonthTransactions(month).catch(() => null);
-    base = { data: cached?.transactions ?? [], offline: true, syncedAt: cached?.syncedAt ?? null };
-  }
-
+/** Mix in any still-queued (not-yet-synced) transactions for this
+ * month, so something just added shows up immediately instead of
+ * only after it's actually reached the server. Sorted back into the
+ * usual newest-first order. */
+async function mergePending(
+  month: string,
+  data: DisplayTransaction[]
+): Promise<DisplayTransaction[]> {
   const queued = await getQueuedTransactions().catch(() => []);
   const pending: DisplayTransaction[] = queued
     .filter((q) => isoDateToMonth(q.occurred_on) === month)
@@ -93,10 +79,42 @@ async function loadMonth(month: string): Promise<LoadResult> {
       localId: q.localId,
     }));
 
-  const data = [...pending, ...base.data].sort(
+  return [...pending, ...data].sort(
     (a, b) => b.occurred_on.localeCompare(a.occurred_on) || b.created_at.localeCompare(a.created_at)
   );
+}
 
+/**
+ * Read straight from IndexedDB — whatever was cached as of the last
+ * successful sync — so there's something to paint instantly instead
+ * of a blank list while the network fetch below is still in flight.
+ */
+async function quickLoadMonth(month: string): Promise<DisplayTransaction[]> {
+  const cached = await getCachedMonthTransactions(month).catch(() => null);
+  return mergePending(month, cached?.transactions ?? []);
+}
+
+/**
+ * GET this month's transactions; on success, refresh the local cache
+ * so it's there next time we're offline (or next time we open the
+ * app, for the instant cache-first paint above). On failure (offline,
+ * or a real server error), fall back to whatever was cached last.
+ */
+async function loadMonth(month: string): Promise<LoadResult> {
+  let base: { data: DisplayTransaction[]; offline: boolean; syncedAt: string | null };
+  try {
+    const res = await fetch(`/api/transactions?month=${month}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    const data: Transaction[] = body.data ?? [];
+    cacheMonthTransactions(month, data).catch(() => {});
+    base = { data, offline: false, syncedAt: null };
+  } catch {
+    const cached = await getCachedMonthTransactions(month).catch(() => null);
+    base = { data: cached?.transactions ?? [], offline: true, syncedAt: cached?.syncedAt ?? null };
+  }
+
+  const data = await mergePending(month, base.data);
   return { ...base, data };
 }
 
@@ -124,6 +142,15 @@ export default function Home() {
     if (!userEmail) return;
     let cancelled = false;
 
+    // Cache-first: paint instantly from whatever synced last time
+    // (this is what makes offline instant already — do it even when
+    // we're online too, instead of always waiting on the network).
+    quickLoadMonth(month).then((data) => {
+      if (!cancelled) setTransactions(data);
+    });
+
+    // Then quietly revalidate against the server and correct the
+    // list (and the cache) once that comes back.
     loadMonth(month).then((result) => {
       if (cancelled) return;
       setTransactions(result.data);

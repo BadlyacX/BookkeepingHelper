@@ -10,7 +10,7 @@ import {
 } from "@/lib/calculator";
 import { categoriesForType } from "@/lib/categories";
 import { formatDateWithWeekday, isToday, shiftDate, todayIsoDate } from "@/lib/date";
-import { queueTransaction } from "@/lib/offlineQueue";
+import { flushQueuedTransactions, queueTransaction } from "@/lib/offlineQueue";
 import type { TransactionType } from "@/lib/categories";
 import type { Transaction } from "@/lib/types";
 
@@ -119,36 +119,31 @@ function NewTransactionForm() {
       note: note || undefined,
     };
 
-    const url = editId ? `/api/transactions/${editId}` : "/api/transactions";
-    const method = editId ? "PATCH" : "POST";
-
     try {
-      if (!editId && !navigator.onLine) {
-        // Genuinely offline: queue locally, sync later. (Editing while
-        // offline isn't supported yet — only new entries queue.)
+      if (!editId) {
+        // Always queue locally first — same instant, offline-safe path
+        // whether we're online or not, instead of blocking navigation
+        // on a network round trip. The list picks this up immediately
+        // from IndexedDB (shown with a 待同步 label) and the sync
+        // below quietly replaces it with the real row once it lands.
         await queueTransaction(tx);
         router.push("/");
         router.refresh();
+        flushQueuedTransactions().catch(() => {});
         return;
       }
 
+      // Editing still goes straight to the server — there's no local
+      // queue for updates yet, so this needs the network.
       let res: Response;
       try {
-        res = await fetch(url, {
-          method,
+        res = await fetch(`/api/transactions/${editId}`, {
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(tx),
         });
       } catch {
-        if (editId) {
-          setError("網路連線失敗,請稍後再試一次");
-          return;
-        }
-        // fetch() itself threw — network is actually unreachable even
-        // though navigator.onLine said otherwise. Queue and move on.
-        await queueTransaction(tx);
-        router.push("/");
-        router.refresh();
+        setError("網路連線失敗,請稍後再試一次");
         return;
       }
 
