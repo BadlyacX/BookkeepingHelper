@@ -27,3 +27,18 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* 版面是固定手機寬度的直式設計,橫向時排版會壞掉。真正的螢幕方向鎖定
+   API 在 iOS Safari 不支援,所以改用這個土法煉鋼的方式:手機/平板橫放
+   時整個蓋一層提示,擋掉底下壞掉的畫面,叫使用者轉回直式。只認觸控
+   裝置(hover:none + pointer:coarse),不會影響桌面瀏覽器(桌機螢幕
+   本來就是「橫向」,不能只看 orientation)。 */
+.portrait-lock {
+  display: none;
+}
+
+@media (orientation: landscape) and (hover: none) and (pointer: coarse) {
+  .portrait-lock {
+    display: flex;
+  }
+}

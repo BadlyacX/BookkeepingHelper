@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "./service-worker-registration";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { PortraitLock } from "@/components/PortraitLock";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {THEME_INIT_SCRIPT}
         </Script>
         {children}
+        <PortraitLock />
         <ServiceWorkerRegistration />
       </body>
     </html>
