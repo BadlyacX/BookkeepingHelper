@@ -48,3 +48,19 @@ export function shiftDate(isoDate: string, deltaDays: number): string {
 export function isToday(isoDate: string): boolean {
   return isoDate === todayIsoDate();
 }
+
+/** Number of days in a "YYYY-MM" month. */
+export function daysInMonth(month: string): number {
+  const [year, mon] = month.split("-").map(Number);
+  return new Date(year, mon, 0).getDate();
+}
+
+/**
+ * Days left in `month` counting from today (inclusive of today).
+ * If `month` isn't the real current month, "remaining" isn't a
+ * meaningful concept — falls back to the whole month's length.
+ */
+export function remainingDaysInMonth(month: string): number {
+  if (month !== currentMonth()) return daysInMonth(month);
+  return daysInMonth(month) - new Date().getDate() + 1;
+}

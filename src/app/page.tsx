@@ -8,6 +8,7 @@ import { findCategory } from "@/lib/categories";
 import {
   currentMonth,
   formatMonthLabel,
+  remainingDaysInMonth,
   shiftMonth,
 } from "@/lib/date";
 import type { Transaction } from "@/lib/types";
@@ -49,6 +50,7 @@ export default function Home() {
   const [month, setMonth] = useState(currentMonth());
   const [menuOpen, setMenuOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [showDailyBudget, setShowDailyBudget] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -77,6 +79,8 @@ export default function Home() {
 
   const balance = totalIncome - totalExpense;
   const dayGroups = useMemo(() => groupByDate(transactions), [transactions]);
+  const remainingDays = remainingDaysInMonth(month);
+  const dailyBudget = balance / remainingDays;
 
   async function handleSync() {
     const { synced, remaining } = await flushQueuedTransactions();
@@ -173,7 +177,11 @@ export default function Home() {
             className="w-44 h-44 rounded-full flex items-center justify-center"
             style={{ background: donutBackground(totalExpense, totalIncome) }}
           >
-            <div className="w-28 h-28 rounded-full bg-white dark:bg-slate-900 flex flex-col items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setShowDailyBudget(true)}
+              className="w-28 h-28 rounded-full bg-white dark:bg-slate-900 flex flex-col items-center justify-center"
+            >
               <p className="text-xs text-gray-500 dark:text-slate-400">結餘</p>
               <p
                 className="text-lg font-semibold"
@@ -181,10 +189,42 @@ export default function Home() {
               >
                 ${formatAmount(balance)}
               </p>
-            </div>
+            </button>
           </div>
         </div>
       </div>
+
+      {showDailyBudget && (
+        <div
+          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-6"
+          onClick={() => setShowDailyBudget(false)}
+        >
+          <div
+            className="w-full max-w-xs bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">
+              每日可用預算(結餘 ÷ 本月剩餘 {remainingDays} 天)
+            </p>
+            {balance < 0 ? (
+              <p className="text-2xl font-semibold text-rose-600 dark:text-rose-400">
+                沒有餘額
+              </p>
+            ) : (
+              <p className="text-2xl font-semibold" style={{ color: INCOME_COLOR }}>
+                ${formatAmount(Math.floor(dailyBudget))} / 天
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowDailyBudget(false)}
+              className="mt-4 w-full rounded-lg bg-gray-100 dark:bg-slate-700 dark:text-slate-100 py-2 text-sm font-medium"
+            >
+              關閉
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-24">
         {dayGroups.length === 0 && (
