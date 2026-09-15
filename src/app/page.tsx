@@ -365,7 +365,6 @@ export default function Home() {
                     // 還沒同步到伺服器的項目沒有真正的資料庫 id,點進去編輯
                     // 會 404,所以不給 href——但一樣可以左滑刪除。
                     href={tx.pending ? undefined : `/new?id=${tx.id}`}
-                    dimmed={tx.pending}
                     onDelete={() => handleDeleteTransaction(tx)}
                   >
                     <span

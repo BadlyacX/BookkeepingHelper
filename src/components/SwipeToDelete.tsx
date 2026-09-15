@@ -15,13 +15,11 @@ const DRAG_THRESHOLD = 6; // px of horizontal movement before it counts as a swi
 export function SwipeToDelete({
   href,
   onDelete,
-  dimmed,
   children,
 }: {
   /** Navigate here on a plain tap. Omit for rows that aren't clickable. */
   href?: string;
   onDelete: () => void;
-  dimmed?: boolean;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -107,14 +105,11 @@ export function SwipeToDelete({
         onPointerCancel={endDrag}
         onClick={handleClick}
         style={{ transform: `translateX(${dragX}px)`, touchAction: "pan-y" }}
-        className={`relative select-none px-4 py-2.5 bg-white dark:bg-slate-900 ${
+        className={`relative select-none cursor-pointer px-4 py-2.5 bg-white dark:bg-slate-900 ${
           isDragging ? "" : "transition-transform duration-200"
-        } ${dimmed ? "" : "cursor-pointer"}`}
+        }`}
       >
-        {/* opacity goes on this inner wrapper, not the row above — that
-            row's background needs to stay fully opaque or the delete
-            button behind it shows through. */}
-        <div className={`flex items-center gap-3 ${dimmed ? "opacity-70" : ""}`}>{children}</div>
+        <div className="flex items-center gap-3">{children}</div>
       </div>
     </div>
   );
