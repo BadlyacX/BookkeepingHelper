@@ -1,7 +1,7 @@
 {
-  "name": "記帳工具",
-  "short_name": "記帳",
-  "description": "個人記帳工具",
+  "name": "記帳小幫手",
+  "short_name": "記帳小幫手",
+  "description": "個人記帳小幫手",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

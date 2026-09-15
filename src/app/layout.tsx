@@ -16,13 +16,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "記帳工具",
-  description: "個人記帳工具",
+  title: "記帳小幫手",
+  description: "個人記帳小幫手",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "記帳",
+    title: "記帳小幫手",
   },
   icons: {
     icon: [

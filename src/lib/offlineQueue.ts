@@ -4,7 +4,7 @@ import type { NewTransaction } from "./types";
 
 /**
  * IndexedDB-backed queue for transactions created while offline.
- * See 記帳工具 技術架構規劃.md — 「前端本機儲存(離線用)」。
+ * See 記帳小幫手 技術架構規劃.md — 「前端本機儲存(離線用)」。
  *
  * Flow: save() while offline → flush() once back online → rows are
  * POSTed to the API and removed from the local queue on success.

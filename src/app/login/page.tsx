@@ -10,7 +10,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
     <main className="flex-1 flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-950">
       <div className="w-full max-w-sm flex flex-col gap-4 bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-6">
         <header>
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">記帳工具</h1>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">記帳小幫手</h1>
           <p className="text-sm text-gray-500 dark:text-slate-400">登入以繼續</p>
         </header>
 
@@ -54,7 +54,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
         </form>
 
         <p className="text-xs text-gray-400 dark:text-slate-500">
-          個人記帳工具,僅供自己使用。註冊後需至信箱完成驗證。
+          個人記帳小幫手,僅供自己使用。註冊後需至信箱完成驗證。
         </p>
       </div>
     </main>
