@@ -30,6 +30,7 @@ function formatAmount(n: number): string {
 
 const EXPENSE_COLOR = "#008ae0";
 const INCOME_COLOR = "#ca8a04";
+const NEGATIVE_COLOR = "#dc2626";
 
 /** Ring showing 支出 as a share of 收入 this month: blue slice for the
  * spent portion, yellow for the rest of income. Caps at a full blue
@@ -174,7 +175,10 @@ export default function Home() {
           >
             <div className="w-28 h-28 rounded-full bg-white dark:bg-slate-900 flex flex-col items-center justify-center">
               <p className="text-xs text-gray-500 dark:text-slate-400">結餘</p>
-              <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
+              <p
+                className="text-lg font-semibold"
+                style={{ color: balance < 0 ? NEGATIVE_COLOR : INCOME_COLOR }}
+              >
                 ${formatAmount(balance)}
               </p>
             </div>
