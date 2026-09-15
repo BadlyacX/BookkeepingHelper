@@ -10,7 +10,7 @@ import {
 } from "@/lib/calculator";
 import { categoriesForType } from "@/lib/categories";
 import { formatDateWithWeekday, isToday, shiftDate, todayIsoDate } from "@/lib/date";
-import { flushQueuedTransactions, queueTransaction } from "@/lib/offlineQueue";
+import { queueTransaction } from "@/lib/offlineQueue";
 import type { TransactionType } from "@/lib/categories";
 import type { Transaction } from "@/lib/types";
 
@@ -124,12 +124,14 @@ function NewTransactionForm() {
         // Always queue locally first — same instant, offline-safe path
         // whether we're online or not, instead of blocking navigation
         // on a network round trip. The list picks this up immediately
-        // from IndexedDB (shown with a 待同步 label) and the sync
-        // below quietly replaces it with the real row once it lands.
+        // from IndexedDB (shown with a 待同步 label); the home page
+        // itself does the actual sync once it lands (not here — firing
+        // it here races with the home page's own load and can show the
+        // same transaction twice: once synced, once still "pending"
+        // because the queue hadn't been cleared yet when it re-read it).
         await queueTransaction(tx);
         router.push("/");
         router.refresh();
-        flushQueuedTransactions().catch(() => {});
         return;
       }
 

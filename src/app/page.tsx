@@ -142,22 +142,37 @@ export default function Home() {
     if (!userEmail) return;
     let cancelled = false;
 
-    // Cache-first: paint instantly from whatever synced last time
-    // (this is what makes offline instant already — do it even when
-    // we're online too, instead of always waiting on the network).
-    quickLoadMonth(month).then((data) => {
-      if (!cancelled) setTransactions(data);
-    });
+    async function run() {
+      // Cache-first: paint instantly from whatever synced last time
+      // (this is what makes offline instant already — do it even when
+      // we're online too, instead of always waiting on the network).
+      const quick = await quickLoadMonth(month);
+      if (cancelled) return;
+      setTransactions(quick);
 
-    // Then quietly revalidate against the server and correct the
-    // list (and the cache) once that comes back.
-    loadMonth(month).then((result) => {
+      // Then quietly revalidate against the server and correct the
+      // list (and the cache) once that comes back.
+      const result = await loadMonth(month);
       if (cancelled) return;
       setTransactions(result.data);
       setOffline(result.offline);
       if (result.offline) setCacheSyncedAt(result.syncedAt);
-    });
 
+      // Only *after* that settles, try syncing anything still queued
+      // (e.g. just added on the previous screen). This has to happen
+      // in sequence, not at the same time as the fetch above — running
+      // both concurrently can catch a transaction mid-sync: already
+      // written to Supabase, but not yet cleared from the local queue,
+      // which would show it twice (once synced, once still "pending").
+      if (!result.offline) {
+        const { synced } = await flushQueuedTransactions();
+        if (cancelled || synced === 0) return;
+        const after = await loadMonth(month);
+        if (!cancelled) setTransactions(after.data);
+      }
+    }
+
+    run();
     return () => {
       cancelled = true;
     };
