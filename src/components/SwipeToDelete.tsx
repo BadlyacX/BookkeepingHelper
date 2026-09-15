@@ -107,11 +107,14 @@ export function SwipeToDelete({
         onPointerCancel={endDrag}
         onClick={handleClick}
         style={{ transform: `translateX(${dragX}px)`, touchAction: "pan-y" }}
-        className={`relative flex items-center gap-3 px-4 py-2.5 select-none bg-white dark:bg-slate-900 ${
+        className={`relative select-none px-4 py-2.5 bg-white dark:bg-slate-900 ${
           isDragging ? "" : "transition-transform duration-200"
-        } ${dimmed ? "opacity-70" : "cursor-pointer"}`}
+        } ${dimmed ? "" : "cursor-pointer"}`}
       >
-        {children}
+        {/* opacity goes on this inner wrapper, not the row above — that
+            row's background needs to stay fully opaque or the delete
+            button behind it shows through. */}
+        <div className={`flex items-center gap-3 ${dimmed ? "opacity-70" : ""}`}>{children}</div>
       </div>
     </div>
   );
