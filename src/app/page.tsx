@@ -101,8 +101,8 @@ export default function Home() {
   }
 
   return (
-    <main className="flex-1 flex flex-col max-w-md w-full mx-auto bg-white dark:bg-slate-900 min-h-dvh relative">
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-slate-700 relative">
+    <main className="flex-1 flex flex-col max-w-md w-full mx-auto bg-white dark:bg-slate-900 h-dvh overflow-hidden relative">
+      <header className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-slate-700 relative">
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
@@ -147,40 +147,42 @@ export default function Home() {
         )}
       </header>
 
-      {syncMessage && (
-        <p className="px-4 pt-2 text-xs text-gray-500 dark:text-slate-400">{syncMessage}</p>
-      )}
+      <div className="shrink-0">
+        {syncMessage && (
+          <p className="px-4 pt-2 text-xs text-gray-500 dark:text-slate-400">{syncMessage}</p>
+        )}
 
-      <div className="flex justify-around px-4 py-4">
-        <div className="text-center rounded-lg px-4 py-1">
-          <p className="text-xs text-gray-500 dark:text-slate-400">支出</p>
-          <p className="text-lg font-semibold" style={{ color: EXPENSE_COLOR }}>
-            ${formatAmount(totalExpense)}
-          </p>
-        </div>
-        <div className="text-center rounded-lg px-4 py-1">
-          <p className="text-xs text-gray-500 dark:text-slate-400">收入</p>
-          <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
-            ${formatAmount(totalIncome)}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex justify-center pb-6">
-        <div
-          className="w-44 h-44 rounded-full flex items-center justify-center"
-          style={{ background: donutBackground(totalExpense, totalIncome) }}
-        >
-          <div className="w-28 h-28 rounded-full bg-white dark:bg-slate-900 flex flex-col items-center justify-center">
-            <p className="text-xs text-gray-500 dark:text-slate-400">結餘</p>
-            <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
-              ${formatAmount(balance)}
+        <div className="flex justify-around px-4 py-4">
+          <div className="text-center rounded-lg px-4 py-1">
+            <p className="text-xs text-gray-500 dark:text-slate-400">支出</p>
+            <p className="text-lg font-semibold" style={{ color: EXPENSE_COLOR }}>
+              ${formatAmount(totalExpense)}
             </p>
+          </div>
+          <div className="text-center rounded-lg px-4 py-1">
+            <p className="text-xs text-gray-500 dark:text-slate-400">收入</p>
+            <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
+              ${formatAmount(totalIncome)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex justify-center pb-6">
+          <div
+            className="w-44 h-44 rounded-full flex items-center justify-center"
+            style={{ background: donutBackground(totalExpense, totalIncome) }}
+          >
+            <div className="w-28 h-28 rounded-full bg-white dark:bg-slate-900 flex flex-col items-center justify-center">
+              <p className="text-xs text-gray-500 dark:text-slate-400">結餘</p>
+              <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
+                ${formatAmount(balance)}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 pb-24">
+      <div className="flex-1 overflow-y-auto overscroll-contain pb-24">
         {dayGroups.length === 0 && (
           <p className="text-center text-sm text-gray-400 dark:text-slate-500 py-8">
             這個月還沒有紀錄,點右下角「+」開始記帳。
