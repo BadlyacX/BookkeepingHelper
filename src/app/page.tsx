@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { flushQueuedTransactions } from "@/lib/offlineQueue";
@@ -194,37 +195,39 @@ export default function Home() {
         </div>
       </div>
 
-      {showDailyBudget && (
-        <div
-          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-6"
-          onClick={() => setShowDailyBudget(false)}
-        >
+      {showDailyBudget &&
+        createPortal(
           <div
-            className="w-full max-w-xs bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 text-center"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+            onClick={() => setShowDailyBudget(false)}
           >
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">
-              每日可用預算(結餘 ÷ 本月剩餘 {remainingDays} 天)
-            </p>
-            {balance < 0 ? (
-              <p className="text-2xl font-semibold text-rose-600 dark:text-rose-400">
-                沒有餘額
-              </p>
-            ) : (
-              <p className="text-2xl font-semibold" style={{ color: INCOME_COLOR }}>
-                ${formatAmount(Math.floor(dailyBudget))} / 天
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowDailyBudget(false)}
-              className="mt-4 w-full rounded-lg bg-gray-100 dark:bg-slate-700 dark:text-slate-100 py-2 text-sm font-medium"
+            <div
+              className="w-full max-w-xs bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 text-center"
+              onClick={(e) => e.stopPropagation()}
             >
-              關閉
-            </button>
-          </div>
-        </div>
-      )}
+              <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">
+                每日可用預算(結餘 ÷ 本月剩餘 {remainingDays} 天)
+              </p>
+              {balance < 0 ? (
+                <p className="text-2xl font-semibold text-rose-600 dark:text-rose-400">
+                  沒有餘額
+                </p>
+              ) : (
+                <p className="text-2xl font-semibold" style={{ color: INCOME_COLOR }}>
+                  ${formatAmount(Math.floor(dailyBudget))} / 天
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowDailyBudget(false)}
+                className="mt-4 w-full rounded-lg bg-gray-100 dark:bg-slate-700 dark:text-slate-100 py-2 text-sm font-medium"
+              >
+                關閉
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
 
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-24">
         {dayGroups.length === 0 && (
