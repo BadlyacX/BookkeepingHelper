@@ -72,6 +72,4 @@ public/manifest.json, sw.js, icons/
 
 ## 待辦
 - 類別管理(目前類別是寫死在 `src/lib/categories.ts`,還不能自訂)
-- 把 `public/icons/` 底下的佔位圖示換成正式 App icon
 - Supabase Dashboard → Authentication 把「Allow new users to sign up」關掉,避免陌生人自行註冊
-- 部署到 Vercel(進行中)
