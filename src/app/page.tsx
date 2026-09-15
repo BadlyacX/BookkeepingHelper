@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { flushQueuedTransactions } from "@/lib/offlineQueue";
+import { cacheMonthTransactions, getCachedMonthTransactions } from "@/lib/transactionCache";
 import { findCategory } from "@/lib/categories";
 import {
   currentMonth,
@@ -45,6 +46,27 @@ function donutBackground(totalExpense: number, totalIncome: number): string {
   return `conic-gradient(${EXPENSE_COLOR} 0deg ${angle}deg, ${INCOME_COLOR} ${angle}deg 360deg)`;
 }
 
+type LoadResult = { data: Transaction[]; offline: boolean; syncedAt: string | null };
+
+/**
+ * GET this month's transactions; on success, refresh the local cache
+ * so it's there next time we're offline. On failure (offline, or a
+ * real server error), fall back to whatever was cached last.
+ */
+async function loadMonth(month: string): Promise<LoadResult> {
+  try {
+    const res = await fetch(`/api/transactions?month=${month}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    const data: Transaction[] = body.data ?? [];
+    cacheMonthTransactions(month, data).catch(() => {});
+    return { data, offline: false, syncedAt: null };
+  } catch {
+    const cached = await getCachedMonthTransactions(month).catch(() => null);
+    return { data: cached?.transactions ?? [], offline: true, syncedAt: cached?.syncedAt ?? null };
+  }
+}
+
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -52,20 +74,33 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [showDailyBudget, setShowDailyBudget] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [cacheSyncedAt, setCacheSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      setUserEmail(data.user?.email ?? null);
+    // getSession() reads the locally-stored session instead of
+    // round-tripping to the Supabase Auth server, so this still
+    // resolves while offline (getUser() would just hang/fail).
+    supabase.auth.getSession().then(({ data }) => {
+      setUserEmail(data.session?.user.email ?? null);
     });
   }, []);
 
   useEffect(() => {
     if (!userEmail) return;
-    fetch(`/api/transactions?month=${month}`)
-      .then((res) => res.json())
-      .then((body) => setTransactions(body.data ?? []))
-      .catch(() => {});
+    let cancelled = false;
+
+    loadMonth(month).then((result) => {
+      if (cancelled) return;
+      setTransactions(result.data);
+      setOffline(result.offline);
+      if (result.offline) setCacheSyncedAt(result.syncedAt);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [userEmail, month]);
 
   const { totalExpense, totalIncome } = useMemo(() => {
@@ -90,10 +125,10 @@ export default function Home() {
         ? "沒有待同步的離線紀錄"
         : `已同步 ${synced} 筆${remaining > 0 ? `,還有 ${remaining} 筆待同步` : ""}`
     );
-    fetch(`/api/transactions?month=${month}`)
-      .then((res) => res.json())
-      .then((body) => setTransactions(body.data ?? []))
-      .catch(() => {});
+    const result = await loadMonth(month);
+    setTransactions(result.data);
+    setOffline(result.offline);
+    if (result.offline) setCacheSyncedAt(result.syncedAt);
   }
 
   if (!userEmail) {
@@ -154,6 +189,20 @@ export default function Home() {
       </header>
 
       <div className="shrink-0">
+        {offline && (
+          <p className="px-4 pt-2 text-xs text-amber-600 dark:text-amber-400">
+            📡 目前離線,顯示
+            {cacheSyncedAt
+              ? `上次同步(${new Date(cacheSyncedAt).toLocaleString("zh-Hant", {
+                  month: "numeric",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })})`
+              : "尚未同步過"}
+            的資料
+          </p>
+        )}
         {syncMessage && (
           <p className="px-4 pt-2 text-xs text-gray-500 dark:text-slate-400">{syncMessage}</p>
         )}

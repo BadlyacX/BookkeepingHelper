@@ -1,6 +1,7 @@
 "use client";
 
 import type { NewTransaction } from "./types";
+import { openDb, PENDING_STORE } from "./db";
 
 /**
  * IndexedDB-backed queue for transactions created while offline.
@@ -10,32 +11,10 @@ import type { NewTransaction } from "./types";
  * POSTed to the API and removed from the local queue on success.
  */
 
-const DB_NAME = "bookkeeping-helper";
-const DB_VERSION = 1;
-const STORE_NAME = "pending-transactions";
-
 export type QueuedTransaction = NewTransaction & {
   localId: string;
   queuedAt: string;
 };
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === "undefined") {
-      reject(new Error("IndexedDB is not available in this environment"));
-      return;
-    }
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: "localId" });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
 
 /** Queue a transaction locally (e.g. because navigator.onLine is false). */
 export async function queueTransaction(
@@ -50,8 +29,8 @@ export async function queueTransaction(
 
   await new Promise<void>((resolve, reject) => {
     const store = db
-      .transaction(STORE_NAME, "readwrite")
-      .objectStore(STORE_NAME);
+      .transaction(PENDING_STORE, "readwrite")
+      .objectStore(PENDING_STORE);
     const request = store.add(queued);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -63,7 +42,7 @@ export async function queueTransaction(
 export async function getQueuedTransactions(): Promise<QueuedTransaction[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const store = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME);
+    const store = db.transaction(PENDING_STORE, "readonly").objectStore(PENDING_STORE);
     const request = store.getAll();
     request.onsuccess = () => resolve(request.result as QueuedTransaction[]);
     request.onerror = () => reject(request.error);
@@ -74,8 +53,8 @@ async function removeQueuedTransaction(localId: string): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const store = db
-      .transaction(STORE_NAME, "readwrite")
-      .objectStore(STORE_NAME);
+      .transaction(PENDING_STORE, "readwrite")
+      .objectStore(PENDING_STORE);
     const request = store.delete(localId);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
