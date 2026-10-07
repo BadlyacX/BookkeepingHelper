@@ -10,7 +10,7 @@ import {
   getQueuedTransactions,
 } from "@/lib/offlineQueue";
 import { cacheMonthTransactions, getCachedMonthTransactions } from "@/lib/transactionCache";
-import { findCategory } from "@/lib/categories";
+import { findCategory, type TransactionType } from "@/lib/categories";
 import {
   currentMonth,
   formatMonthLabel,
@@ -130,6 +130,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [showDailyBudget, setShowDailyBudget] = useState(false);
+  const [breakdownType, setBreakdownType] = useState<TransactionType | null>(null);
   const [offline, setOffline] = useState(false);
   const [cacheSyncedAt, setCacheSyncedAt] = useState<string | null>(null);
 
@@ -192,6 +193,29 @@ export default function Home() {
     }
     return { totalExpense, totalIncome };
   }, [transactions]);
+
+  // Per-category share of this month's 支出 / 收入 for the breakdown
+  // popup. Categories at 0% (no transactions, or rounding to 0.0%)
+  // are left out; biggest first.
+  const breakdown = useMemo(() => {
+    if (!breakdownType) return [];
+    const total = breakdownType === "expense" ? totalExpense : totalIncome;
+    if (total <= 0) return [];
+    const sums = new Map<string, number>();
+    for (const tx of transactions) {
+      if (tx.type !== breakdownType) continue;
+      sums.set(tx.category, (sums.get(tx.category) ?? 0) + tx.amount);
+    }
+    return Array.from(sums.entries())
+      .map(([id, amount]) => ({
+        id,
+        amount,
+        percent: Math.round((amount / total) * 1000) / 10,
+        category: findCategory(breakdownType, id),
+      }))
+      .filter((row) => row.percent > 0)
+      .sort((a, b) => b.amount - a.amount);
+  }, [breakdownType, transactions, totalExpense, totalIncome]);
 
   const balance = totalIncome - totalExpense;
   const dayGroups = useMemo(() => groupByDate(transactions), [transactions]);
@@ -321,18 +345,26 @@ export default function Home() {
         )}
 
         <div className="flex justify-around px-4 py-4">
-          <div className="text-center rounded-lg px-4 py-1">
+          <button
+            type="button"
+            onClick={() => setBreakdownType("expense")}
+            className="text-center rounded-lg px-4 py-1 active:bg-gray-100 dark:active:bg-slate-800"
+          >
             <p className="text-xs text-gray-500 dark:text-slate-400">支出</p>
             <p className="text-lg font-semibold" style={{ color: EXPENSE_COLOR }}>
               ${formatAmount(totalExpense)}
             </p>
-          </div>
-          <div className="text-center rounded-lg px-4 py-1">
+          </button>
+          <button
+            type="button"
+            onClick={() => setBreakdownType("income")}
+            className="text-center rounded-lg px-4 py-1 active:bg-gray-100 dark:active:bg-slate-800"
+          >
             <p className="text-xs text-gray-500 dark:text-slate-400">收入</p>
             <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
               ${formatAmount(totalIncome)}
             </p>
-          </div>
+          </button>
         </div>
 
         <div className="flex justify-center pb-6">
@@ -356,6 +388,67 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {breakdownType &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+            onClick={() => setBreakdownType(null)}
+          >
+            <div
+              className="w-full max-w-xs max-h-[80dvh] flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-sm text-gray-500 dark:text-slate-400 mb-3 text-center">
+                {formatMonthLabel(month)}
+                {breakdownType === "expense" ? "支出" : "收入"}分類佔比
+              </p>
+              {breakdown.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 dark:text-slate-500 py-6">
+                  這個月還沒有{breakdownType === "expense" ? "支出" : "收入"}紀錄
+                </p>
+              ) : (
+                <ul className="flex-1 min-h-0 overflow-y-auto space-y-3">
+                  {breakdown.map((row) => (
+                    <li key={row.id}>
+                      <div className="flex items-center gap-2 text-sm dark:text-slate-100">
+                        <span
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-base shrink-0 ${row.category?.chipClassName ?? "bg-gray-100 dark:bg-slate-700"}`}
+                        >
+                          {row.category?.emoji ?? "🔖"}
+                        </span>
+                        <span className="flex-1 truncate">{row.category?.label ?? row.id}</span>
+                        <span className="tabular-nums text-gray-500 dark:text-slate-400">
+                          ${formatAmount(row.amount)}
+                        </span>
+                        <span className="w-14 text-right font-medium tabular-nums">
+                          {row.percent}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${row.percent}%`,
+                            backgroundColor: row.category?.chartColor ?? "#9ca3af",
+                          }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => setBreakdownType(null)}
+                className="mt-4 w-full rounded-lg bg-gray-100 dark:bg-slate-700 dark:text-slate-100 py-2 text-sm font-medium"
+              >
+                關閉
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {showDailyBudget &&
         createPortal(
