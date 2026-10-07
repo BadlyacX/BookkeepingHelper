@@ -120,6 +120,7 @@ async function loadMonth(month: string): Promise<LoadResult> {
 
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authFailed, setAuthFailed] = useState(false);
   // Which transactions currently have a delete in flight — guards
   // against a fast double-tap firing the delete twice (a `deleting`
   // state alone can't catch a second tap that lands before the
@@ -136,12 +137,56 @@ export default function Home() {
 
   useEffect(() => {
     const supabase = createClient();
+    let settled = false;
+
+    // getSession() 沒有 session(過期/被清掉)、丟出錯誤、或卡在
+    // 重新整理 token 時,userEmail 都不會被設定,畫面就會永遠停在
+    // 「載入中…」。所以每種失敗路徑都要有出口:能登入就導去登入頁,
+    // 不行(離線等)就顯示可以重試的提示。
+    function fail() {
+      if (settled) return;
+      settled = true;
+      let alreadyRedirected = false;
+      try {
+        alreadyRedirected = sessionStorage.getItem("auth-redirected") === "1";
+      } catch {}
+      if (navigator.onLine && !alreadyRedirected) {
+        try {
+          sessionStorage.setItem("auth-redirected", "1");
+        } catch {}
+        window.location.replace("/login");
+        return;
+      }
+      setAuthFailed(true);
+    }
+
+    const timer = setTimeout(fail, 8000);
+
     // getSession() reads the locally-stored session instead of
     // round-tripping to the Supabase Auth server, so this still
     // resolves while offline (getUser() would just hang/fail).
-    supabase.auth.getSession().then(({ data }) => {
-      setUserEmail(data.session?.user.email ?? null);
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        const email = data.session?.user.email;
+        if (!email) return fail();
+        settled = true;
+        try {
+          sessionStorage.removeItem("auth-redirected");
+        } catch {}
+        setAuthFailed(false);
+        setUserEmail(email);
+      })
+      .catch(fail);
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") window.location.replace("/login");
     });
+
+    return () => {
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -272,8 +317,27 @@ export default function Home() {
     // proxy.ts 已經在 server 端擋掉未登入的請求,這裡短暫顯示只是
     // 因為瀏覽器端的 getUser() 還沒回來。
     return (
-      <main className="flex-1 flex items-center justify-center p-8">
-        <p className="text-sm text-gray-500 dark:text-slate-400">載入中…</p>
+      <main className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          {authFailed ? "無法確認登入狀態" : "載入中…"}
+        </p>
+        {authFailed && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-gray-100 dark:bg-slate-700 dark:text-slate-100 px-4 py-2 text-sm font-medium"
+            >
+              重試
+            </button>
+            <a
+              href="/login"
+              className="rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-medium"
+            >
+              重新登入
+            </a>
+          </div>
+        )}
       </main>
     );
   }
