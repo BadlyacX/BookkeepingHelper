@@ -60,7 +60,20 @@ export function daysInMonth(month: string): number {
  * If `month` isn't the real current month, "remaining" isn't a
  * meaningful concept — falls back to the whole month's length.
  */
-export function remainingDaysInMonth(month: string): number {
-  if (month !== currentMonth()) return daysInMonth(month);
-  return daysInMonth(month) - new Date().getDate() + 1;
+export function remainingDaysInMonth(
+  month: string,
+  includeWeekends = true
+): number {
+  const [year, mon] = month.split("-").map(Number);
+  const first = month === currentMonth() ? new Date().getDate() : 1;
+  const last = daysInMonth(month);
+
+  if (includeWeekends) return last - first + 1;
+
+  let count = 0;
+  for (let day = first; day <= last; day++) {
+    const weekday = new Date(year, mon - 1, day).getDay();
+    if (weekday !== 0 && weekday !== 6) count++;
+  }
+  return count;
 }

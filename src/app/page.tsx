@@ -40,6 +40,7 @@ function formatAmount(n: number): string {
 const EXPENSE_COLOR = "#008ae0";
 const INCOME_COLOR = "#ca8a04";
 const NEGATIVE_COLOR = "#dc2626";
+const INCLUDE_WEEKENDS_KEY = "dailyBudgetIncludeWeekends";
 
 /** Ring showing 支出 as a share of 收入 this month: blue slice for the
  * spent portion, yellow for the rest of income. Caps at a full blue
@@ -130,6 +131,17 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [showDailyBudget, setShowDailyBudget] = useState(false);
+  // Whether Sat/Sun count as days to spread the balance over. Persisted
+  // per device. The first render is only the "載入中" placeholder (it
+  // doesn't depend on this), so reading storage in the initializer can't
+  // cause a hydration mismatch; on the server it throws and falls back.
+  const [includeWeekends, setIncludeWeekends] = useState(() => {
+    try {
+      return localStorage.getItem(INCLUDE_WEEKENDS_KEY) !== "false";
+    } catch {
+      return true;
+    }
+  });
   const [offline, setOffline] = useState(false);
   const [cacheSyncedAt, setCacheSyncedAt] = useState<string | null>(null);
 
@@ -142,6 +154,15 @@ export default function Home() {
       setUserEmail(data.session?.user.email ?? null);
     });
   }, []);
+
+  function handleToggleWeekends(value: boolean) {
+    setIncludeWeekends(value);
+    try {
+      localStorage.setItem(INCLUDE_WEEKENDS_KEY, String(value));
+    } catch {
+      // Private browsing / storage disabled — just won't persist.
+    }
+  }
 
   useEffect(() => {
     if (!userEmail) return;
@@ -195,8 +216,8 @@ export default function Home() {
 
   const balance = totalIncome - totalExpense;
   const dayGroups = useMemo(() => groupByDate(transactions), [transactions]);
-  const remainingDays = remainingDaysInMonth(month);
-  const dailyBudget = balance / remainingDays;
+  const remainingDays = remainingDaysInMonth(month, includeWeekends);
+  const dailyBudget = remainingDays > 0 ? balance / remainingDays : 0;
 
   async function refresh() {
     const result = await loadMonth(month);
@@ -368,17 +389,32 @@ export default function Home() {
               onClick={(e) => e.stopPropagation()}
             >
               <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">
-                每日可用預算(結餘 ÷ 本月剩餘 {remainingDays} 天)
+                每日可用預算(結餘 ÷ 本月剩餘 {remainingDays} 天
+                {includeWeekends ? "" : ",不含週末"})
               </p>
               {balance < 0 ? (
                 <p className="text-2xl font-semibold text-rose-600 dark:text-rose-400">
                   沒有餘額
+                </p>
+              ) : remainingDays === 0 ? (
+                <p className="text-base font-medium text-gray-500 dark:text-slate-400">
+                  本月剩下的日子都是週末
                 </p>
               ) : (
                 <p className="text-2xl font-semibold" style={{ color: INCOME_COLOR }}>
                   ${formatAmount(Math.floor(dailyBudget))} / 天
                 </p>
               )}
+              <label className="mt-4 flex items-center justify-between gap-3 text-sm text-gray-700 dark:text-slate-200 cursor-pointer">
+                <span>週末也算</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={includeWeekends}
+                  onChange={(e) => handleToggleWeekends(e.target.checked)}
+                  className="h-5 w-5 accent-indigo-600"
+                />
+              </label>
               <button
                 type="button"
                 onClick={() => setShowDailyBudget(false)}
