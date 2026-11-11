@@ -150,9 +150,24 @@ export default function Home() {
     // getSession() reads the locally-stored session instead of
     // round-tripping to the Supabase Auth server, so this still
     // resolves while offline (getUser() would just hang/fail).
-    supabase.auth.getSession().then(({ data }) => {
-      setUserEmail(data.session?.user.email ?? null);
-    });
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        if (data.session) {
+          setUserEmail(data.session.user.email ?? null);
+          return;
+        }
+        // The server-side proxy let us in, but the browser has no usable
+        // session (e.g. a stale/revoked refresh token left in cookies).
+        // Without this we'd sit on "載入中" forever. Clear the local
+        // leftovers first — otherwise the proxy could bounce /login back
+        // to / and loop.
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        window.location.replace("/login");
+      })
+      .catch(() => {
+        window.location.replace("/login");
+      });
   }, []);
 
   function handleToggleWeekends(value: boolean) {
