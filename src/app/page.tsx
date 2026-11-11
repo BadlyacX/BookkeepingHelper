@@ -10,7 +10,7 @@ import {
   getQueuedTransactions,
 } from "@/lib/offlineQueue";
 import { cacheMonthTransactions, getCachedMonthTransactions } from "@/lib/transactionCache";
-import { findCategory } from "@/lib/categories";
+import { findCategory, type TransactionType } from "@/lib/categories";
 import {
   currentMonth,
   formatMonthLabel,
@@ -121,6 +121,7 @@ async function loadMonth(month: string): Promise<LoadResult> {
 
 export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authFailed, setAuthFailed] = useState(false);
   // Which transactions currently have a delete in flight — guards
   // against a fast double-tap firing the delete twice (a `deleting`
   // state alone can't catch a second tap that lands before the
@@ -131,6 +132,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [showDailyBudget, setShowDailyBudget] = useState(false);
+<<<<<<< HEAD
   // Whether Sat/Sun count as days to spread the balance over. Persisted
   // per device. The first render is only the "載入中" placeholder (it
   // doesn't depend on this), so reading storage in the initializer can't
@@ -142,16 +144,45 @@ export default function Home() {
       return true;
     }
   });
+=======
+  const [breakdownType, setBreakdownType] = useState<TransactionType | null>(null);
+>>>>>>> 3aff699e6478de063d814a133ce5ebf7e30c1626
   const [offline, setOffline] = useState(false);
   const [cacheSyncedAt, setCacheSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
+    let settled = false;
+
+    // getSession() 沒有 session(過期/被清掉)、丟出錯誤、或卡在
+    // 重新整理 token 時,userEmail 都不會被設定,畫面就會永遠停在
+    // 「載入中…」。所以每種失敗路徑都要有出口:能登入就導去登入頁,
+    // 不行(離線等)就顯示可以重試的提示。
+    function fail() {
+      if (settled) return;
+      settled = true;
+      let alreadyRedirected = false;
+      try {
+        alreadyRedirected = sessionStorage.getItem("auth-redirected") === "1";
+      } catch {}
+      if (navigator.onLine && !alreadyRedirected) {
+        try {
+          sessionStorage.setItem("auth-redirected", "1");
+        } catch {}
+        window.location.replace("/login");
+        return;
+      }
+      setAuthFailed(true);
+    }
+
+    const timer = setTimeout(fail, 8000);
+
     // getSession() reads the locally-stored session instead of
     // round-tripping to the Supabase Auth server, so this still
     // resolves while offline (getUser() would just hang/fail).
     supabase.auth
       .getSession()
+<<<<<<< HEAD
       .then(async ({ data }) => {
         if (data.session) {
           setUserEmail(data.session.user.email ?? null);
@@ -168,6 +199,28 @@ export default function Home() {
       .catch(() => {
         window.location.replace("/login");
       });
+=======
+      .then(({ data }) => {
+        const email = data.session?.user.email;
+        if (!email) return fail();
+        settled = true;
+        try {
+          sessionStorage.removeItem("auth-redirected");
+        } catch {}
+        setAuthFailed(false);
+        setUserEmail(email);
+      })
+      .catch(fail);
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") window.location.replace("/login");
+    });
+
+    return () => {
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
+>>>>>>> 3aff699e6478de063d814a133ce5ebf7e30c1626
   }, []);
 
   function handleToggleWeekends(value: boolean) {
@@ -229,6 +282,29 @@ export default function Home() {
     return { totalExpense, totalIncome };
   }, [transactions]);
 
+  // Per-category share of this month's 支出 / 收入 for the breakdown
+  // popup. Categories at 0% (no transactions, or rounding to 0.0%)
+  // are left out; biggest first.
+  const breakdown = useMemo(() => {
+    if (!breakdownType) return [];
+    const total = breakdownType === "expense" ? totalExpense : totalIncome;
+    if (total <= 0) return [];
+    const sums = new Map<string, number>();
+    for (const tx of transactions) {
+      if (tx.type !== breakdownType) continue;
+      sums.set(tx.category, (sums.get(tx.category) ?? 0) + tx.amount);
+    }
+    return Array.from(sums.entries())
+      .map(([id, amount]) => ({
+        id,
+        amount,
+        percent: Math.round((amount / total) * 1000) / 10,
+        category: findCategory(breakdownType, id),
+      }))
+      .filter((row) => row.percent > 0)
+      .sort((a, b) => b.amount - a.amount);
+  }, [breakdownType, transactions, totalExpense, totalIncome]);
+
   const balance = totalIncome - totalExpense;
   const dayGroups = useMemo(() => groupByDate(transactions), [transactions]);
   const remainingDays = remainingDaysInMonth(month, includeWeekends);
@@ -284,8 +360,27 @@ export default function Home() {
     // proxy.ts 已經在 server 端擋掉未登入的請求,這裡短暫顯示只是
     // 因為瀏覽器端的 getUser() 還沒回來。
     return (
-      <main className="flex-1 flex items-center justify-center p-8">
-        <p className="text-sm text-gray-500 dark:text-slate-400">載入中…</p>
+      <main className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
+        <p className="text-sm text-gray-500 dark:text-slate-400">
+          {authFailed ? "無法確認登入狀態" : "載入中…"}
+        </p>
+        {authFailed && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-gray-100 dark:bg-slate-700 dark:text-slate-100 px-4 py-2 text-sm font-medium"
+            >
+              重試
+            </button>
+            <a
+              href="/login"
+              className="rounded-lg bg-indigo-600 text-white px-4 py-2 text-sm font-medium"
+            >
+              重新登入
+            </a>
+          </div>
+        )}
       </main>
     );
   }
@@ -357,18 +452,26 @@ export default function Home() {
         )}
 
         <div className="flex justify-around px-4 py-4">
-          <div className="text-center rounded-lg px-4 py-1">
+          <button
+            type="button"
+            onClick={() => setBreakdownType("expense")}
+            className="text-center rounded-lg px-4 py-1 active:bg-gray-100 dark:active:bg-slate-800"
+          >
             <p className="text-xs text-gray-500 dark:text-slate-400">支出</p>
             <p className="text-lg font-semibold" style={{ color: EXPENSE_COLOR }}>
               ${formatAmount(totalExpense)}
             </p>
-          </div>
-          <div className="text-center rounded-lg px-4 py-1">
+          </button>
+          <button
+            type="button"
+            onClick={() => setBreakdownType("income")}
+            className="text-center rounded-lg px-4 py-1 active:bg-gray-100 dark:active:bg-slate-800"
+          >
             <p className="text-xs text-gray-500 dark:text-slate-400">收入</p>
             <p className="text-lg font-semibold" style={{ color: INCOME_COLOR }}>
               ${formatAmount(totalIncome)}
             </p>
-          </div>
+          </button>
         </div>
 
         <div className="flex justify-center pb-6">
@@ -392,6 +495,67 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {breakdownType &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+            onClick={() => setBreakdownType(null)}
+          >
+            <div
+              className="w-full max-w-xs max-h-[80dvh] flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-sm text-gray-500 dark:text-slate-400 mb-3 text-center">
+                {formatMonthLabel(month)}
+                {breakdownType === "expense" ? "支出" : "收入"}分類佔比
+              </p>
+              {breakdown.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 dark:text-slate-500 py-6">
+                  這個月還沒有{breakdownType === "expense" ? "支出" : "收入"}紀錄
+                </p>
+              ) : (
+                <ul className="flex-1 min-h-0 overflow-y-auto space-y-3">
+                  {breakdown.map((row) => (
+                    <li key={row.id}>
+                      <div className="flex items-center gap-2 text-sm dark:text-slate-100">
+                        <span
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-base shrink-0 ${row.category?.chipClassName ?? "bg-gray-100 dark:bg-slate-700"}`}
+                        >
+                          {row.category?.emoji ?? "🔖"}
+                        </span>
+                        <span className="flex-1 truncate">{row.category?.label ?? row.id}</span>
+                        <span className="tabular-nums text-gray-500 dark:text-slate-400">
+                          ${formatAmount(row.amount)}
+                        </span>
+                        <span className="w-14 text-right font-medium tabular-nums">
+                          {row.percent}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${row.percent}%`,
+                            backgroundColor: row.category?.chartColor ?? "#9ca3af",
+                          }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => setBreakdownType(null)}
+                className="mt-4 w-full rounded-lg bg-gray-100 dark:bg-slate-700 dark:text-slate-100 py-2 text-sm font-medium"
+              >
+                關閉
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {showDailyBudget &&
         createPortal(
