@@ -132,7 +132,6 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [showDailyBudget, setShowDailyBudget] = useState(false);
-<<<<<<< HEAD
   // Whether Sat/Sun count as days to spread the balance over. Persisted
   // per device. The first render is only the "載入中" placeholder (it
   // doesn't depend on this), so reading storage in the initializer can't
@@ -144,9 +143,7 @@ export default function Home() {
       return true;
     }
   });
-=======
   const [breakdownType, setBreakdownType] = useState<TransactionType | null>(null);
->>>>>>> 3aff699e6478de063d814a133ce5ebf7e30c1626
   const [offline, setOffline] = useState(false);
   const [cacheSyncedAt, setCacheSyncedAt] = useState<string | null>(null);
 
@@ -182,24 +179,6 @@ export default function Home() {
     // resolves while offline (getUser() would just hang/fail).
     supabase.auth
       .getSession()
-<<<<<<< HEAD
-      .then(async ({ data }) => {
-        if (data.session) {
-          setUserEmail(data.session.user.email ?? null);
-          return;
-        }
-        // The server-side proxy let us in, but the browser has no usable
-        // session (e.g. a stale/revoked refresh token left in cookies).
-        // Without this we'd sit on "載入中" forever. Clear the local
-        // leftovers first — otherwise the proxy could bounce /login back
-        // to / and loop.
-        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-        window.location.replace("/login");
-      })
-      .catch(() => {
-        window.location.replace("/login");
-      });
-=======
       .then(({ data }) => {
         const email = data.session?.user.email;
         if (!email) return fail();
@@ -220,7 +199,6 @@ export default function Home() {
       clearTimeout(timer);
       sub.subscription.unsubscribe();
     };
->>>>>>> 3aff699e6478de063d814a133ce5ebf7e30c1626
   }, []);
 
   function handleToggleWeekends(value: boolean) {
